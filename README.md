@@ -771,4 +771,5 @@ docs/02_page_manager.md
 
 **Sai Krishna Varanasi**  
 Senior C++ Systems Engineer
+
 Modern C++ • Linux Systems Programming • Database Internals • Distributed Systems • Performance Engineering
