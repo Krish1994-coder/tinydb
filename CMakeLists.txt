@@ -40,14 +40,27 @@ add_library(tinydb_lib
     # Phase 3: src/storage/storage_manager.cpp
     # Phase 4: src/page/page.cpp
     # Phase 5: src/buffer/buffer_pool.cpp
+
+    # PageManager
+    src/storage/page_manager.cpp
 )
 
 target_include_directories(tinydb_lib PUBLIC include)
 
 # ── Tests ────────────────────────────────────────────────────
 enable_testing()
-# Uncomment as each module is implemented:
-# add_executable(test_storage tests/storage/test_storage_manager.cpp)
-# target_link_libraries(test_storage tinydb_lib GTest::gtest_main)
-# add_test(NAME StorageTests COMMAND test_storage)
 
+# PageManager tests
+add_executable(test_page_manager
+    tests/storage/page_manager_test.cpp
+)
+
+target_link_libraries(test_page_manager
+    PRIVATE tinydb_lib
+    PRIVATE GTest::gtest_main
+)
+
+target_compile_features(test_page_manager PRIVATE cxx_std_17)
+
+include(GoogleTest)
+gtest_discover_tests(test_page_manager)
