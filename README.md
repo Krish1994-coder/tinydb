@@ -1,342 +1,179 @@
 # TinyDB
-> A relational database engine built from scratch in Modern C++17.
 
-TinyDB is an educational and portfolio project focused on understanding the
-internal architecture and implementation of modern relational database
-systems.
+> A relational database engine built from scratch in Modern C++17, with a
+> production-oriented systems architecture.
 
-Rather than simply reproducing an existing implementation, the goal is to
-design and implement each subsystem from first principles while studying the
-engineering concepts behind production databases such as SQLite and
-PostgreSQL.
+TinyDB is an actively developed database engine focused on understanding and
+implementing the core systems behind modern relational databases.
 
-The project follows an engineering-first approach:
+The project is built incrementally from the storage layer upward, with an
+emphasis on clear subsystem boundaries, explicit ownership, well-defined
+interfaces, correctness, failure handling, durability, and testability.
 
-```text
-Architecture → Design → Implementation → Testing → Benchmarking → Documentation
-```
+The architecture is informed by established database systems such as SQLite
+and PostgreSQL while maintaining an independent implementation and file format.
 
 ---
 
-# Goals
+# Engineering Status
 
-- Understand database storage internals.
-- Learn page-based storage management.
-- Design and implement a Storage Manager.
-- Design and implement a Page Manager.
-- Build a Buffer Pool Manager.
-- Implement a B+ Tree index.
-- Build a SQL parser.
-- Implement query planning and execution.
-- Add transaction management.
-- Implement concurrency control.
-- Implement Write-Ahead Logging (WAL) and crash recovery.
-- Analyze and optimize database performance.
-- Develop production-oriented systems programming skills using Modern C++.
+> **Work in Progress — foundational storage components are implemented and
+> the database engine is being extended incrementally.**
+
+Current implementation status:
+
+| Component | Status |
+|-----------|--------|
+| Project Architecture | Complete |
+| Storage Manager | Complete |
+| Database File Format | Complete |
+| Page Allocation | Complete |
+| Page I/O | Complete |
+| File Header Validation | Complete |
+| Explicit Durability / `fsync()` | Complete |
+| Page Manager | Complete |
+| Record Management | Complete |
+| Page Validation | Complete |
+| Page Compaction | Complete |
+| Buffer Pool Manager | Planned |
+| B+ Tree Index | Planned |
+| Query Engine | Planned |
+| Transactions | Planned |
+| Concurrency Control | Planned |
+| WAL / Crash Recovery | Planned |
+| Performance Engineering | Planned |
+
+The current implementation establishes the persistence and page-management
+foundations required by the higher layers.
 
 ---
 
-# Project Roadmap
+# Current Milestone
 
-| Phase | Component | Status |
-|------:|-----------|--------|
-| Phase 0 | Development Environment | Completed |
-| Phase 1 | Repository Setup | Completed |
-| Phase 2 | Architecture & Design | In Progress |
-| Phase 3 | Storage Engine Implementation | Planned |
-| Phase 4 | Page Manager | Planned |
-| Phase 5 | Buffer Pool Manager | Planned |
-| Phase 6 | B+ Tree Index | Planned |
-| Phase 7 | SQL Parser | Planned |
-| Phase 8 | Query Planning & Execution | Planned |
-| Phase 9 | Transactions & Concurrency Control | Planned |
-| Phase 10 | Recovery & WAL | Planned |
-| Phase 11 | Performance Engineering | Planned |
+The current milestone focuses on the storage and page-management foundations.
 
-## Current Phase Status
+Implemented functionality includes:
 
-```text
-Phase 2 — Architecture & Design
-│
-├── Project Overview
-│   └── ✓ Completed
-│
-├── Storage Engine Design
-│   └── ✓ Completed
-│
-├── Storage Engine Learning Notes
-│   └── ✓ Completed
-│
-├── Storage Manager Public Interface
-│   └── ✓ Defined
-│
-├── Page Identifier
-│   └── ✓ Defined
-│
-├── Storage Engine Architecture Diagram
-│   └── ✓ Completed
-│
-└── Next
-    └── Page Manager Design
-```
+- Database file creation and opening.
+- Persistent database file metadata.
+- Fixed-size 4 KiB pages.
+- Monotonically allocated page identifiers.
+- Page-granular reads and writes.
+- Explicit durability boundaries through `fsync()`.
+- File-header validation and corruption detection.
+- Zero-initialized newly allocated pages.
+- Page lifecycle management.
+- Slotted-page record organization.
+- Record insertion, retrieval, deletion, and update.
+- Tombstone handling.
+- Page validation and invariant checking.
+- Page compaction.
+- Comprehensive unit-test coverage using GoogleTest.
 
-The Storage Engine has been designed but has not yet been implemented.
-Implementation begins after the Page Manager and related design work are
-completed.
+The implementation currently has **109 automated tests passing** across the
+storage and page-management components.
 
-## High-Level Architecture
+---
 
-TinyDB uses a layered architecture in which query processing, data access,
-memory management, and persistent storage have clearly separated
-responsibilities.
+# Architecture
 
-The Catalog, Transaction Manager, Concurrency Control, and WAL operate as
-supporting services rather than simple sequential layers.
+TinyDB follows a layered architecture with explicit ownership and
+responsibilities between subsystems.
 
 ```text
-                     Client Application
-                            │
-                            ▼
-                     +--------------+
-                     |  Client API  |
-                     +------+-------+
-                            │
-                            ▼
-                     +--------------+
-                     |    Parser    |
-                     |   SQL → AST  |
-                     +------+-------+
-                            │
-                            ▼
-                +-------------------------+
-                | Analyzer + Catalog      |
-                | • Name resolution       |
-                | • Type validation       |
-                | • Metadata lookup       |
-                +-----------+-------------+
-                            │
-                            ▼
-                +-------------------------+
-                | Planner / Optimizer     |
-                | AST → Execution Plan    |
-                +-----------+-------------+
-                            │
-                            ▼
-                     +--------------+
-                     |   Executor   |
-                     +------+-------+
-                            │
-                +-----------+-----------+
-                │                       │
-                ▼                       ▼
-         +-------------+         +-------------+
-         | Table / Heap|         |   B+ Tree   |
-         | Scan        |         |    Index    |
-         +------+------+         +------+------+
-                │                       │
-                +-----------+-----------+
-                            │
-                            ▼
-                     +--------------+
-                     | Buffer Pool  |
-                     |  Page Cache  |
-                     +------+-------+
-                            │
-                            ▼
-                     +--------------+
-                     |   Storage    |
-                     |   Manager    |
-                     +------+-------+
-                            │
-                            ▼
-                     +--------------+
-                     | database.tdb |
-                     +--------------+
+                         Client Application
+                                |
+                                v
+                         +--------------+
+                         |  Client API  |
+                         +------+-------+
+                                |
+                                v
+                         +--------------+
+                         |    Parser    |
+                         |   SQL -> AST |
+                         +------+-------+
+                                |
+                                v
+                  +---------------------------+
+                  | Analyzer + Catalog        |
+                  |                           |
+                  | Name resolution           |
+                  | Type validation           |
+                  | Metadata lookup           |
+                  +-------------+-------------+
+                                |
+                                v
+                  +---------------------------+
+                  | Planner / Optimizer       |
+                  |                           |
+                  | AST -> Execution Plan     |
+                  +-------------+-------------+
+                                |
+                                v
+                         +--------------+
+                         |   Executor   |
+                         +------+-------+
+                                |
+                    +-----------+-----------+
+                    |                       |
+                    v                       v
+             +-------------+         +-------------+
+             | Table / Heap|         |   B+ Tree   |
+             |    Scan     |         |    Index    |
+             +------+------+         +------+------+
+                    |                       |
+                    +-----------+-----------+
+                                |
+                                v
+                       +----------------+
+                       |  Buffer Pool   |
+                       |   Page Cache   |
+                       +-------+--------+
+                               |
+                               v
+                       +----------------+
+                       | StorageManager |
+                       +-------+--------+
+                               |
+                               v
+                        +--------------+
+                        | database.tdb |
+                        +--------------+
+
+        Cross-cutting services:
+        Transaction Manager
+        Concurrency Control
+        WAL / Recovery
 ```
 
-## Query Processing Flow
+The architecture deliberately separates:
 
-A typical SQL query flows through TinyDB approximately as follows:
-
-```text
-Client Application
-        │
-        ▼
-     Client API
-        │
-        ▼
-      Parser
-        │
-        ▼
- Abstract Syntax Tree
-        │
-        ▼
- Analyzer + Catalog
-        │
-        ├── Validate table and column references
-        ├── Resolve metadata and data types
-        └── Identify available indexes
-        │
-        ▼
- Planner / Optimizer
-        │
-        └── Select an execution strategy
-        │
-        ▼
-   Execution Plan
-        │
-        ▼
-     Executor
-        │
-        ├───────────────────────┐
-        │                       │
-        ▼                       ▼
-   Table / Heap            B+ Tree Index
-       Scan                    Scan
-        │                       │
-        └───────────┬───────────┘
-                    ▼
-               Buffer Pool
-                    │
-             ┌──────┴──────┐
-             │             │
-             ▼             ▼
-         Cache Hit     Cache Miss
-             │             │
-             │             ▼
-             │      Storage Manager
-             │             │
-             │             ▼
-             │        database.tdb
-             │
-             └─────────────► Executor
-```
-
-The Buffer Pool Manager keeps frequently accessed pages in memory.
-When the required page is already cached, the executor can operate on the
-in-memory page.
-
-When the required page is not cached, the Buffer Pool requests the page from
-the Storage Manager.
-
-The Storage Manager performs page-granular file I/O against `database.tdb`.
-It treats page contents as opaque bytes and does not interpret records,
-indexes, or SQL.
-
-The Page Manager is responsible for interpreting the layout of an individual
-page and managing records and free space within that page.
+- **Planning** — determines what operations should be performed.
+- **Execution** — performs the selected operations.
+- **Buffer Pool** — manages in-memory database pages.
+- **Storage Manager** — performs persistent page-level I/O.
+- **Page Manager** — interprets and manages the contents of individual pages.
+- **Catalog** — owns database metadata.
+- **Transaction Manager** — manages transaction lifecycle.
+- **Concurrency Control** — coordinates concurrent access.
+- **WAL / Recovery** — provides crash-recovery infrastructure.
 
 ## Storage Architecture
 
-The Buffer Pool and Storage Manager form the persistent page-I/O path.
-The Page Manager is responsible for interpreting the contents of pages that
-have been brought into memory by the Buffer Pool. It is not a replacement
-for the Storage Manager and it does not perform database-file I/O.
-
-```text
-                    Executor / Index
-                           │
-                           ▼
-                    +--------------+
-                    | Buffer Pool  |
-                    |  Page Cache  |
-                    +------+-------+
-                           │
-              ┌────────────┴────────────┐
-              │                         │
-              ▼                         ▼
-       Page already cached        Page not cached
-              │                         │
-              │                         ▼
-              │                 +---------------+
-              │                 | Storage       |
-              │                 | Manager       |
-              │                 +-------+-------+
-              │                         │
-              │                         ▼
-              │                   database.tdb
-              │
-              ▼
-       +--------------+
-       | Page Manager |
-       | Page Layout  |
-       +------+-------+
-              │
-              ▼
-       Page Header / Slots / Records
-```
-
-### Storage Manager
-
-The Storage Manager is responsible for:
-
-- Database file creation, opening, and closing.
-- Page allocation.
-- Page-granular reads.
-- Page-granular writes.
-- Page count management.
-- Flushing pending writes using `fsync`.
-
-The Storage Manager does not understand records, tables, indexes, SQL, or
-query plans.
-
-### Page Manager
-
-The Page Manager is responsible for the internal organization of data inside
-individual pages.
-
-The initial design is expected to use a slotted-page organization for storing
-variable-length records and managing free space within a fixed-size page.
-
-### Buffer Pool Manager
-
-The Buffer Pool Manager provides the in-memory page cache between higher-level
-database components and persistent storage.
-
-## Cross-Cutting Services
-
-Some database services do not form a simple vertical layer. They interact
-with multiple components.
-
-```text
-        +----------------------+
-        | Transaction Manager  |
-        +----------+-----------+
-                   │
-                   ▼
-        +----------------------+
-        | Lock / Concurrency   |
-        | Control              |
-        +----------+-----------+
-                   │
-                   ▼
-             Query Execution
-             / Buffer Pool
-        +----------------------+
-        |    WAL / Log Manager |
-        +----------+-----------+
-                   │
-                   ▼
-             Persistent Log
-```
-
-These services will be designed and implemented in later phases.
-
----
-
-# Storage Engine Design
-
-The initial database format uses a single binary file:
+The current persistence model uses a single binary database file composed of
+fixed-size pages.
 
 ```text
 database.tdb
-
 +---------------------------+
-| Page 0 — File Header      |
+| Page 0 -- File Header     |
+|                           |
 | Magic                     |
 | Format Version            |
 | Page Size                 |
 | Page Count                |
+| Reserved                  |
 +---------------------------+
 | Page 1                    |
 +---------------------------+
@@ -350,26 +187,57 @@ database.tdb
 +---------------------------+
 ```
 
-The initial page size is designed around 4 KiB pages.
+For the current Phase-2 format:
 
-The Storage Manager locates a page using:
+- Page size = 4096 bytes
+
+The physical location of a page is deterministic:
 
 ```text
-offset = page_id × page_size
+offset = page_id * page_size
 ```
 
-The Storage Manager exposes page-level operations such as:
+Page 0 is reserved for database-level metadata.
 
-- `CreateDatabase()`
-- `OpenDatabase()`
-- `CloseDatabase()`
-- `AllocatePage()`
-- `ReadPage()`
-- `WritePage()`
-- `Flush()`
-- `GetPageCount()`
-- `GetPageSize()`
-- `IsOpen()`
+Pages after page 0 are treated as opaque storage by the Storage Manager.
+Their internal structure is owned by the Page Manager and higher layers.
+
+Detailed storage-engine design is documented in:
+
+```text
+docs/01_storage_engine.md
+```
+
+## Storage Manager
+
+The `StorageManager` is the persistence boundary between the database engine
+and the operating system.
+
+It is responsible for:
+
+- Database creation.
+- Database opening.
+- Database closing.
+- File-header management.
+- Page allocation.
+- Full-page reads.
+- Full-page writes.
+- Page-count management.
+- File validation.
+- Explicit durability through `fsync()`.
+
+It deliberately does not understand:
+
+- Records.
+- Slots.
+- Tables.
+- Indexes.
+- SQL.
+- Query plans.
+- Transactions.
+- Buffer-pool policy.
+
+This keeps physical file I/O isolated from logical database structures.
 
 The public interface is defined in:
 
@@ -377,133 +245,282 @@ The public interface is defined in:
 include/tinydb/storage/storage_manager.h
 ```
 
-The page identifier definition is located in:
+The implementation is located in:
 
 ```text
-include/tinydb/storage/page_id.h
+src/storage/storage_manager.cpp
+```
+
+## Page Manager
+
+The Page Manager owns the internal layout of data pages.
+
+The current implementation uses a slotted-page organization for variable-length
+records inside fixed-size pages.
+
+```text
++------------------------------------------------+
+|                 Page Header                    |
++------------------------------------------------+
+|                                                |
+|                 Record Data                    |
+|                                                |
+|                   Free Space                   |
+|                                                |
++------------------------------------------------+
+|               Slot Directory                   |
++------------------------------------------------+
+```
+
+The Page Manager is responsible for:
+
+- Page initialization.
+- Page validation.
+- Record insertion.
+- Record retrieval.
+- Record deletion.
+- Record updates.
+- Slot management.
+- Tombstone handling.
+- Free-space accounting.
+- Page compaction.
+- Preservation of record identifiers where required.
+
+The Page Manager does not perform direct database-file I/O.
+
+All persistent page access passes through the Storage Manager.
+
+Detailed design is documented in:
+
+```text
+docs/02_page_manager.md
+```
+
+## Buffer Pool
+
+The Buffer Pool Manager is the next major persistence-layer component.
+
+Its responsibility will be to provide an in-memory cache of database pages
+between higher-level components and the Storage Manager.
+
+Conceptually:
+
+```text
+              Higher-Level Components
+                       |
+                       v
+                +-------------+
+                | Buffer Pool |
+                | Page Cache  |
+                +------+------+
+                       |
+              +--------+--------+
+              |                 |
+              v                 v
+          Cache Hit         Cache Miss
+              |                 |
+              |                 v
+              |          StorageManager
+              |                 |
+              |                 v
+              |            database.tdb
+              |
+              v
+          Page Manager
+```
+
+The Buffer Pool will own page residency, frame management, eviction policy,
+pinning/unpinning, and dirty-page tracking.
+
+## Query Processing
+
+The planned query-processing pipeline is:
+
+```text
+SQL
+ |
+ v
+Parser
+ |
+ v
+AST
+ |
+ v
+Analyzer + Catalog
+ |
+ v
+Planner / Optimizer
+ |
+ v
+Execution Plan
+ |
+ v
+Executor
+ |
+ +---------------+
+ |               |
+ v               v
+Table Scan    Index Scan
+ |               |
+ +-------+-------+
+         |
+         v
+     Buffer Pool
+         |
+         v
+    Page Manager
+         |
+         v
+   Storage Manager
+         |
+         v
+    database.tdb
+```
+
+The query engine will be implemented after the foundational storage and memory
+management layers are stable.
+
+## Transactions, Concurrency, and Recovery
+
+Transactions, concurrency control, and recovery are treated as cross-cutting
+database services rather than simple sequential layers.
+
+The intended architecture is:
+
+```text
+                 +----------------------+
+                 | Transaction Manager  |
+                 +----------+-----------+
+                            |
+                            v
+                 +----------------------+
+                 | Concurrency Control  |
+                 +----------+-----------+
+                            |
+                            v
+                      Query Execution
+                            |
+                            v
+                       Buffer Pool
+                            |
+                            v
+                 +----------------------+
+                 |    WAL / Recovery    |
+                 +----------+-----------+
+                            |
+                            v
+                     Persistent Log
+```
+
+The recovery subsystem will use Write-Ahead Logging to establish the ordering
+between durable log records and durable database pages.
+
+These capabilities are planned for later development phases.
+
+---
+
+# Correctness and Reliability
+
+Correctness is treated as a first-class engineering requirement.
+
+The implementation emphasizes:
+
+- Explicit API contracts.
+- Input validation.
+- Persistent metadata validation.
+- Corruption detection.
+- Deterministic page layout.
+- Clear ownership and lifetime rules.
+- Explicit error propagation.
+- Protection against partial page I/O.
+- Explicit durability boundaries.
+- Page-level invariants.
+- Failure-path testing.
+- Regression testing for previously implemented behavior.
+
+Storage operations return explicit status values rather than relying on
+exceptions crossing the storage-engine boundary.
+
+The current status model includes conditions such as:
+
+- `OK`
+- `InvalidArgument`
+- `AlreadyExists`
+- `NotFound`
+- `Corruption`
+- `IOError`
+- `OutOfSpace`
+- `NotOpen`
+
+---
+
+# Testing
+
+Testing is developed alongside each subsystem rather than being postponed
+until the end of the project.
+
+The current test suite covers:
+
+```text
+Page Manager
+    |
+    +-- Page initialization
+    +-- Page validation
+    +-- Record insertion
+    +-- Record retrieval
+    +-- Record deletion
+    +-- Record updates
+    +-- Tombstone handling
+    +-- Page compaction
+    +-- Boundary / corruption cases
+
+Storage Manager
+    |
+    +-- Database creation
+    +-- Existing-file handling
+    +-- Database opening
+    +-- Database closing
+    +-- Page allocation
+    +-- Zero initialization
+    +-- Page read/write
+    +-- Persistence across reopen
+    +-- Invalid arguments
+    +-- Flush
+    +-- Header corruption
+```
+
+Run the complete suite with:
+
+```bash
+ctest --test-dir build --output-on-failure
+```
+
+The current implementation passes:
+
+```text
+109 / 109 tests
 ```
 
 ---
 
-# Example Query Execution
+# Build
 
-Consider:
+TinyDB uses CMake and targets Modern C++17.
 
-```sql
-SELECT id, name
-FROM accounts
-WHERE id = 42;
+```bash
+git clone <repository-url>
+cd tinydb
+mkdir -p build
+cd build
+cmake ..
+cmake --build . -j"$(nproc)"
 ```
 
-The conceptual execution path is:
+Run tests:
 
-```text
-Client Application
-        │
-        ▼
-     Client API
-        │
-        ▼
-      Parser
-        │
-        ▼
- Analyzer + Catalog
-        │
-        ├── accounts exists?
-        ├── id exists?
-        ├── name exists?
-        └── What indexes are available?
-        │
-        ▼
-     Planner
-        │
-        └── Select IndexScan if appropriate
-        │
-        ▼
-     Executor
-        │
-        ▼
-   B+ Tree Index
-        │
-        ▼
-    Buffer Pool
-        │
-   ┌────┴────┐
-   │         │
-   ▼         ▼
-Cache Hit  Cache Miss
-   │         │
-   │         ▼
-   │   Storage Manager
-   │         │
-   │         ▼
-   │    database.tdb
-   │
-   └────────► Executor
+```bash
+ctest --test-dir build --output-on-failure
 ```
-
-The important distinction is:
-
-- **Planner** decides *WHAT* should happen.
-- **Executor** performs the chosen operations.
-- **Buffer Pool** decides *WHETHER* the required page is already in memory.
-- **Storage Manager** performs persistent page I/O when required.
-- **Page Manager** understands *HOW* data is organized inside a page.
-
----
-
-# Transactions, Concurrency, and WAL
-
-These components are intentionally treated as cross-cutting services.
-
-### Transaction Manager
-
-Responsible for:
-
-- `BEGIN`
-- `COMMIT`
-- `ROLLBACK`
-- Transaction state
-- Transaction lifecycle
-
-### Concurrency Control
-
-Responsible for coordinating concurrent operations.
-
-Future responsibilities include:
-
-- Locks or latches where appropriate.
-- Transaction isolation.
-- Safe concurrent access.
-- Deadlock handling where applicable.
-
-The initial implementation prioritizes correctness over advanced concurrency.
-
-### WAL / Recovery
-
-The WAL subsystem will provide crash recovery.
-
-```text
-Transaction
-     │
-     ▼
-Change
-     │
-     ▼
-WAL / Log Manager
-     │
-     ▼
-Persistent Log
-```
-
-The core durability principle will be based on Write-Ahead Logging:
-
-> Log record must reach durable storage  
-> before the corresponding dirty database page  
-> is allowed to become the durable representation  
-> of that change.
-
-Detailed WAL and recovery design will be introduced in a later phase.
 
 ---
 
@@ -511,91 +528,59 @@ Detailed WAL and recovery design will be introduced in a later phase.
 
 ```text
 tinydb/
-├── include/
-│   └── tinydb/
-│       ├── buffer/
-│       ├── catalog/
-│       ├── common/
-│       ├── concurrency/
-│       ├── execution/
-│       ├── index/
-│       ├── parser/
-│       ├── recovery/
-│       ├── storage/
-│       │   ├── page_id.h
-│       │   └── storage_manager.h
-│       └── transaction/
-├── src/
-│   ├── buffer/
-│   ├── catalog/
-│   ├── common/
-│   ├── concurrency/
-│   ├── execution/
-│   ├── index/
-│   ├── parser/
-│   ├── recovery/
-│   ├── storage/
-│   └── transaction/
-├── tests/
-│   ├── buffer/
-│   ├── catalog/
-│   ├── concurrency/
-│   ├── execution/
-│   ├── index/
-│   ├── parser/
-│   ├── recovery/
-│   ├── storage/
-│   └── transaction/
-├── docs/
-├── diagrams/
-├── notes/
-├── benchmarks/
-├── examples/
-├── scripts/
-├── third_party/
-├── CMakeLists.txt
-├── README.md
-└── LICENSE
-```
-
----
-
-# Build
-
-TinyDB uses CMake as its build system.
-
-```bash
-mkdir -p build
-cd build
-cmake ..
-cmake --build .
-```
-
-The project targets Modern C++17.
-
----
-
-# Testing
-
-Testing will be introduced alongside each subsystem rather than postponed
-until the end of the project.
-
-```text
-Implementation
-      ↓
-Unit Tests
-      ↓
-Integration Tests
-      ↓
-Correctness Validation
-      ↓
-Benchmarking
-```
-
-Storage-related tests will live under:
-
-```text
-tests/storage/
+|-- include/
+|   +-- tinydb/
+|       |-- buffer/
+|       |-- catalog/
+|       |-- common/
+|       |-- concurrency/
+|       |-- execution/
+|       |-- index/
+|       |-- parser/
+|       |-- recovery/
+|       |-- storage/
+|       |   |-- page_id.h
+|       |   |-- storage_manager.h
+|       |   +-- ...
+|       +-- transaction/
+|
+|-- src/
+|   |-- buffer/
+|   |-- catalog/
+|   |-- common/
+|   |-- concurrency/
+|   |-- execution/
+|   |-- index/
+|   |-- parser/
+|   |-- recovery/
+|   |-- storage/
+|   |   |-- page_manager.cpp
+|   |   +-- storage_manager.cpp
+|   +-- transaction/
+|
+|-- tests/
+|   |-- buffer/
+|   |-- catalog/
+|   |-- concurrency/
+|   |-- execution/
+|   |-- index/
+|   |-- parser/
+|   |-- recovery/
+|   |-- storage/
+|   |   |-- page_manager_test.cpp
+|   |   +-- storage_manager_test.cpp
+|   +-- transaction/
+|
+|-- docs/
+|-- diagrams/
+|-- notes/
+|-- benchmarks/
+|-- examples/
+|-- scripts/
+|-- third_party/
+|-- CMakeLists.txt
+|-- README.md
++-- LICENSE
 ```
 
 ---
@@ -604,8 +589,8 @@ tests/storage/
 
 | Document | Description |
 |----------|-------------|
-| `docs/00_project_overview.md` | Overall project scope and architecture |
-| `docs/01_storage_engine.md` | Storage Engine design and public interface |
+| `docs/00_project_overview.md` | Overall architecture and project scope |
+| `docs/01_storage_engine.md` | Storage engine design and persistence model |
 | `docs/02_page_manager.md` | Page layout and record organization |
 | `docs/03_buffer_pool.md` | Buffer Pool and page caching |
 | `docs/04_bplus_tree.md` | B+ Tree index |
@@ -616,74 +601,82 @@ tests/storage/
 
 ---
 
-# Learning Notes
-
-The `notes/` directory contains personal study material used during the
-design process.
-
-```text
-notes/
-└── storage_engine_notes.md
-```
-
-These notes are intentionally separated from the formal engineering
-documentation under `docs/`.
-
----
-
 # Engineering Workflow
 
-Every subsystem follows the same development lifecycle:
+Each subsystem follows a repeatable engineering lifecycle:
 
 ```text
-Learn
-  │
-  ▼
-Understand the problem and underlying system concepts
-  │
-  ▼
+Understand
+    |
+    v
 Architect
-  │
-  ▼
-Define component boundaries and interactions
-  │
-  ▼
-Design
-  │
-  ▼
-Define interfaces, data structures, invariants, and failure modes
-  │
-  ▼
+    |
+    v
+Define Interfaces
+    |
+    v
+Define Invariants
+    |
+    v
 Implement
-  │
-  ▼
-Test
-  │
-  ▼
+    |
+    v
+Unit Test
+    |
+    v
+Failure-Path Test
+    |
+    v
+Integration Test
+    |
+    v
 Benchmark
-  │
-  ▼
+    |
+    v
 Document
-  │
-  ▼
+    |
+    v
 Review
-  │
-  ▼
-Commit
 ```
+
+The goal is to establish correctness and clear contracts before introducing
+performance optimizations or additional system complexity.
 
 ---
 
 # Design Principles
 
-- **Separation of Responsibilities** — each subsystem owns a clearly defined concern.
-- **Explicit Interfaces** — components communicate through well-defined APIs.
-- **Page-Oriented Storage** — persistent database state is organized around fixed-size pages.
-- **Centralized Buffering** — the Buffer Pool owns database-level page caching.
-- **Correctness Before Optimization** — establish correct behavior and invariants before introducing advanced optimizations.
-- **Clear Ownership** — resources such as files, pages, frames, and locks have explicit ownership and lifetime rules.
-- **Testability** — subsystems should be independently testable where practical.
-- **Production-Oriented Design** — design decisions are compared with concepts used by systems such as SQLite and PostgreSQL.
+**Separation of Responsibilities**
+Each subsystem owns a clearly defined concern and exposes explicit interfaces
+to adjacent components.
+
+**Explicit Ownership**
+Files, pages, frames, locks, and other resources have defined ownership and
+lifetime rules.
+
+**Correctness Before Optimization**
+Correctness, invariants, and failure handling are established before
+performance optimizations are introduced.
+
+**Page-Oriented Storage**
+Persistent database state is organized around fixed-size pages.
+
+**Centralized Buffering**
+Database-level page caching belongs to the Buffer Pool rather than the
+Storage Manager.
+
+**Explicit Durability**
+Persistence and durability are separate concepts. Page writes can be batched,
+while explicit flush operations establish durability boundaries.
+
+**Testability**
+Subsystems are designed so that their behavior and failure modes can be
+validated independently where practical.
+
+**Production-Oriented Engineering**
+Design decisions consider real systems concerns including failure handling,
+data corruption, durability, resource ownership, API contracts, concurrency
+boundaries, observability, performance, and maintainability.
 
 ---
 
@@ -693,83 +686,87 @@ Commit
 |------|--------|
 | Language | Modern C++17 |
 | Build System | CMake |
-| Testing | Google Test |
-| Platform | Linux / POSIX-oriented development |
+| Testing | GoogleTest |
+| Platform | Linux / POSIX |
 | Version Control | Git |
+
+---
+
+# Roadmap
+
+| Phase | Component | Status |
+|-------|-----------|--------|
+| 0 | Development Environment | Complete |
+| 1 | Repository & Architecture | Complete |
+| 2 | Storage Engine | Complete |
+| 3 | Page Manager | Complete |
+| 4 | Buffer Pool Manager | Next |
+| 5 | B+ Tree Index | Planned |
+| 6 | SQL Parser | Planned |
+| 7 | Query Planning & Execution | Planned |
+| 8 | Transactions & Concurrency | Planned |
+| 9 | WAL & Crash Recovery | Planned |
+| 10 | Performance Engineering | Planned |
+
+The roadmap is intentionally incremental. Higher-level database functionality
+will be built on top of the storage and memory-management foundations rather
+than implemented independently of them.
 
 ---
 
 # Design References
 
-- **CMU 15-445 Database Systems** — Database storage, buffer pools, indexing, execution, and transactions
-- **Database Internals — Alex Petrov** — Storage engines, B+ Trees, storage layouts, and database internals
-- **SQLite File Format** — Concrete reference for page-oriented database storage
-- **PostgreSQL** — Reference for production-oriented storage and database architecture
-- **POSIX APIs** — `open()`, `pread()`, `pwrite()`, `fsync()`
+The implementation is informed by established database and systems concepts
+including:
+
+- CMU 15-445 Database Systems.
+- Database Internals — Alex Petrov.
+- SQLite file-format and storage architecture.
+- PostgreSQL storage and buffer-management architecture.
+- POSIX file I/O primitives such as `open()`, `pread()`, `pwrite()`, and
+  `fsync()`.
+
+These references provide engineering guidance and architectural context.
+TinyDB maintains its own implementation, interfaces, and on-disk format.
 
 ---
 
-# Future Areas
-
-The following areas are intentionally deferred until the foundational
-components are stable:
-
-- Advanced Query Optimization
-- Distributed Execution
-- Replication
-- Networking
-- Authentication
-- Multi-node Storage
-- Advanced Recovery
-- Advanced Concurrency
-- Async I/O
-- Direct I/O
-- Memory Mapping
-- Performance Tuning
-
----
-
-# Next Milestone
-
-The next subsystem is the **Page Manager**.
-
-The Page Manager will define how records are organized inside a fixed-size
-page.
-
-The intended relationship is:
+# Current Focus
 
 ```text
-                Buffer Pool
-                     │
-                     │ page memory
-                     ▼
-                Page Manager
-                     │
-         +-----------+-----------+
-         │                       │
-         ▼                       ▼
-    Page Header             Slot Directory
-         │                       │
-         +-----------+-----------+
-                     │
-                     ▼
-                Record Data
+Storage Engine
+      |
+      v
+Page Manager
+      |
+      v
+Buffer Pool       <-- current focus
+      |
+      v
+B+ Tree
+      |
+      v
+Query Execution
+      |
+      v
+Transactions
+      |
+      v
+WAL / Recovery
+      |
+      v
+Performance Engineering
 ```
 
-The Buffer Pool obtains pages through the Storage Manager when necessary.
-The Page Manager interprets the contents of those pages.
-
-The next design document is:
-
-```text
-docs/02_page_manager.md
-```
+The next milestone is the Buffer Pool Manager, which will establish the
+in-memory page-management layer between higher-level database components and
+persistent storage.
 
 ---
 
 # Author
 
-**Sai Krishna Varanasi**  
-Senior C++ Systems Engineer
+**Sai Krishna Varanasi**
 
-Modern C++ • Linux Systems Programming • Database Internals • Distributed Systems • Performance Engineering
+C++ Systems Engineering | Linux | Database Internals | Backend Systems |
+Performance Engineering
