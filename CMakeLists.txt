@@ -37,7 +37,9 @@ FetchContent_MakeAvailable(googletest)
 # Source files added explicitly as each module is implemented.
 # Never use GLOB_RECURSE — it hides file additions from CMake.
 add_library(tinydb_lib
-    # Phase 3: src/storage/storage_manager.cpp
+    # StorageManager
+    src/storage/storage_manager.cpp
+
     # Phase 4: src/page/page.cpp
     # Phase 5: src/buffer/buffer_pool.cpp
 
@@ -64,3 +66,17 @@ target_compile_features(test_page_manager PRIVATE cxx_std_17)
 
 include(GoogleTest)
 gtest_discover_tests(test_page_manager)
+
+# StorageManager tests
+add_executable(test_storage_manager
+    tests/storage/storage_manager_test.cpp
+)
+
+target_link_libraries(test_storage_manager
+    PRIVATE tinydb_lib
+    PRIVATE GTest::gtest_main
+)
+
+target_compile_features(test_storage_manager PRIVATE cxx_std_17)
+
+gtest_discover_tests(test_storage_manager)
